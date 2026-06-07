@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pymupdf
+langchain
+langchain-openai
+langchain-text-splitters
+openai
+pinecone-client
+cloudinary
+pymongo[srv]
+python-dotenv
+pydantic
