@@ -26,6 +26,8 @@ export interface ChatMessage {
 interface AppStore {
   userId: string;
   setUserId: (userId: string) => void;
+  sessionId: string;
+  setSessionId: (sessionId: string) => void;
   documents: Document[];
   setDocuments: (documents: Document[]) => void;
   addDocument: (doc: Document) => void;
@@ -62,6 +64,9 @@ export const useAppStore = create<AppStore>()(
         }
       },
 
+      sessionId: '',
+      setSessionId: (sessionId) => set({ sessionId }),
+
       documents: [],
       setDocuments: (documents) => set({ documents }),
       addDocument: (doc) => set((state) => ({ documents: [...state.documents, doc] })),
@@ -92,12 +97,13 @@ export const useAppStore = create<AppStore>()(
       setError: (error) => set({ error }),
 
       clearDocuments: () =>
-        set({ documents: [], selectedDocIds: [], messages: [] }),
+        set({ documents: [], selectedDocIds: [], messages: [], sessionId: '' }),
     }),
     {
       name: 'app-store',
       partialize: (state) => ({
         userId: state.userId,
+        sessionId: state.sessionId,
         documents: state.documents,
         selectedDocIds: state.selectedDocIds,
         messages: state.messages,

@@ -29,6 +29,7 @@ export interface ChatResponse {
   answer: string;
   citations: Citation[];
   used_retrieval: boolean;
+  session_id: string;
 }
 
 export const apiService = {
@@ -49,12 +50,14 @@ export const apiService = {
   async chat(
     query: string,
     documentIds: string[],
-    userId: string
+    userId: string,
+    sessionId: string
   ): Promise<ChatResponse> {
     const response = await apiClient.post<ChatResponse>('/api/chat', {
       query,
       document_ids: documentIds,
       user_id: userId,
+      session_id: sessionId,
     });
 
     return response.data;

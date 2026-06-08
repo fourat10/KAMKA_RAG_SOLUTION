@@ -4,9 +4,12 @@ import React, { useState, useRef, useEffect } from "react";
 import { apiService } from "@/lib/api";
 import { useAppStore, type ChatMessage } from "@/lib/store";
 import { CitationCard } from "./CitationCard";
+import { MarkdownText } from "./MarkdownText";
 
 export function ChatInterface() {
   const userId = useAppStore((state) => state.userId);
+  const sessionId = useAppStore((state) => state.sessionId);
+  const setSessionId = useAppStore((state) => state.setSessionId);
   const selectedDocIds = useAppStore((state) => state.selectedDocIds);
   const messages = useAppStore((state) => state.messages);
   const addMessage = useAppStore((state) => state.addMessage);
@@ -17,6 +20,14 @@ export function ChatInterface() {
 
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Generate session ID on component mount if not already set
+  useEffect(() => {
+    if (!sessionId) {
+      const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      setSessionId(newSessionId);
+    }
+  }, [sessionId, setSessionId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -46,7 +57,12 @@ export function ChatInterface() {
     setError(null);
 
     try {
-      const response = await apiService.chat(input, selectedDocIds, userId);
+      const response = await apiService.chat(
+        input,
+        selectedDocIds,
+        userId,
+        sessionId,
+      );
 
       const assistantMessage: ChatMessage = {
         id: `msg_${Date.now() + 1}`,
@@ -100,7 +116,9 @@ export function ChatInterface() {
                     : "bg-gray-100 text-gray-900"
                 }`}
               >
-                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                <p className="text-sm whitespace-pre-wrap">
+                  <MarkdownText text={msg.content} />
+                </p>
 
                 {msg.role === "assistant" &&
                   msg.citations &&

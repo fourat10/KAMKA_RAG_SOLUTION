@@ -96,11 +96,9 @@ def make_summarize_tool(document_ids: list[str]):
                 m["metadata"].get("text", "") for m in matches
             )
 
-            return (
-                f"Document: {filename}\n"
-                f"Total chunks: {total_chunks}\n\n"
-                f"Full content:\n{full_text}"
-            )
+            # Return just the content without document ID or metadata
+            # The LLM will summarize the raw content naturally
+            return full_text
 
         except Exception as e:
             return f"Error fetching document content: {str(e)}"

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
 from agent.agent import run_agent
 from services.mongodb_client import get_document
+from services.memory import get_history, save_turn
 
 router = APIRouter()
 
@@ -10,6 +11,7 @@ class ChatRequest(BaseModel):
     query: str
     document_ids: list[str]
     user_id: str
+    session_id: str
 
     @field_validator("query")
     @classmethod
@@ -32,6 +34,13 @@ class ChatRequest(BaseModel):
             raise ValueError("user_id cannot be empty.")
         return v.strip()
 
+    @field_validator("session_id")
+    @classmethod
+    def session_id_must_not_be_empty(cls, v):
+        if not v.strip():
+            raise ValueError("session_id cannot be empty.")
+        return v.strip()
+
 
 class CitationResponse(BaseModel):
     reference: str
@@ -45,18 +54,18 @@ class ChatResponse(BaseModel):
     answer: str
     citations: list[CitationResponse]
     used_retrieval: bool
+    session_id: str
 
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """
-    Receives a user query, verifies document ownership, runs the agent,
-    and returns the answer with structured citations.
+    Receives a user query, loads conversation history from MongoDB,
+    runs the agent with history context, saves the turn, and returns
+    the answer with structured citations.
     """
 
     # --- Verify every document_id belongs to this user ---
-    # This prevents a user from querying another user's documents
-    # even if they know the document_id
     for doc_id in request.document_ids:
         doc = get_document(document_id=doc_id, user_id=request.user_id)
         if not doc:
@@ -65,11 +74,20 @@ async def chat(request: ChatRequest):
                 detail=f"Document '{doc_id}' not found or does not belong to this user."
             )
 
+    # --- Load conversation history from MongoDB ---
+    history = get_history(session_id=request.session_id, limit=10)
+
+    # --- DEBUG PRINTS ---
+    print(f"\n{'='*60}")
+    print(f"  SESSION ID : {request.session_id}")
+    print(f"  QUERY      : {request.query}")
+    print(f"  HISTORY    : {len(history)} messages loaded")
+    for i, msg in enumerate(history):
+        preview = msg['content'][:80].replace('\n', ' ')
+        print(f"    [{i}] {msg['role']}: {preview}")
+    print(f"{'='*60}\n")
+
     # --- Inject document_ids into the query ---
-    # The agent needs to know which document IDs are available so it can
-    # pass the correct one to summarize_document when needed.
-    # We append this context to the query — invisible to the user but
-    # visible to the LLM so it knows exactly which IDs to use.
     doc_ids_str = ", ".join(request.document_ids)
     enriched_query = (
         f"{request.query}\n\n"
@@ -80,12 +98,21 @@ async def chat(request: ChatRequest):
         result = run_agent(
             query=enriched_query,
             document_ids=request.document_ids,
+            history=history,
+        )
+
+        # --- Save this turn to MongoDB ---
+        save_turn(
+            session_id=request.session_id,
+            user_message=request.query,
+            assistant_answer=result["answer"],
         )
 
         return ChatResponse(
             answer=result["answer"],
             citations=result["citations"],
             used_retrieval=len(result["citations"]) > 0,
+            session_id=request.session_id,
         )
 
     except Exception as e:

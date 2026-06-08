@@ -1,7 +1,7 @@
 import os
 from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import ToolMessage, HumanMessage, AIMessage
 
 from agent.retriever import make_retrieve_tool
 from agent.calculator_tool import calculator
@@ -43,66 +43,75 @@ Important rules:
   "I couldn't find information about this in the selected documents."
   Never make up or guess information that isn't in the documents
 - When the user asks to summarize, use the document_id provided in the query context
+- You have access to the conversation history — use it to answer follow-up questions
+  and maintain context across the conversation
 - Never mention internal terms like "chunk", "vector", "namespace",
   "embedding", or "Pinecone" to the user
 - Be concise and factual"""
 
 
-def run_agent(query: str, document_ids: list[str]) -> dict:
+def run_agent(
+    query: str,
+    document_ids: list[str],
+    history: list[dict] | None = None,
+) -> dict:
     """
-    Runs the LangChain agent with three tools scoped to the selected documents.
-
-    The tools are created fresh per request via factory functions
-    (make_retrieve_tool, make_summarize_tool) that capture document_ids
-    in their closure — the LLM never sees or controls the document filter.
+    Runs the LangChain agent with conversation history support.
 
     Args:
-        query: the user's question (with document_ids injected by chat.py)
-        document_ids: list of document IDs selected by the user in the frontend.
-                      Only chunks from these documents will be retrieved.
+        query: the enriched user query (with document_ids injected by chat.py)
+        document_ids: list of document IDs selected by the user
+        history: list of previous messages from MongoDB
+                 [{"role": "user", "content": "..."}, ...]
 
     Returns:
         {
             "answer": the LLM's final answer string,
-            "citations": list of structured citation objects built from
-                         real chunk metadata (not from what the LLM wrote)
+            "citations": list of structured citation objects
         }
     """
     model = get_model()
 
-    # Build scoped tools — document_ids are locked in via closure
-    # The LLM controls WHAT to search, but never WHOSE documents to search
+    # Build scoped tools — document_ids locked in via closure
     retrieve_tool = make_retrieve_tool(document_ids)
     summarize_tool = make_summarize_tool(document_ids)
     tools = [retrieve_tool, calculator, summarize_tool]
 
-    # create_agent builds a tool-calling agent using the messages interface.
-    # The LLM decides which tool to call based on the query and tool descriptions.
     agent = create_agent(
         model=model,
         tools=tools,
         system_prompt=SYSTEM_PROMPT,
     )
 
-    # Invoke with the enriched query that includes available document IDs
-    response = agent.invoke({
-        "messages": [{"role": "user", "content": query}]
-    })
+    # Convert history dicts to LangChain message objects
+    # LangGraph's create_agent requires HumanMessage/AIMessage objects
+    # not plain {"role": ..., "content": ...} dicts for history
+    if history is None:
+        history = []
 
-    # The final answer is always the last message in the response
+    message_objects = []
+    for msg in history:
+        if msg["role"] == "user":
+            message_objects.append(HumanMessage(content=msg["content"]))
+        elif msg["role"] == "assistant":
+            message_objects.append(AIMessage(content=msg["content"]))
+
+    # Add the current query as the final HumanMessage
+    message_objects.append(HumanMessage(content=query))
+
+    response = agent.invoke({"messages": message_objects})
+
+    # Final answer is the last message in the response
     answer = response["messages"][-1].content
 
-    # Extract retrieved Document objects from ToolMessages
-    # ToolMessage with an artifact attribute means retrieve_context was called
-    # response_format="content_and_artifact" puts the raw docs in message.artifact
+    # Extract retrieved Document objects from ToolMessages for citations
     retrieved_docs = []
     for message in response["messages"]:
         if isinstance(message, ToolMessage) and hasattr(message, "artifact"):
             if isinstance(message.artifact, list):
                 retrieved_docs.extend(message.artifact)
 
-    # Build structured citations from real chunk metadata — not from LLM output
-    # citation_parser.py maps [1][2] references back to the actual Document objects
+    # Build structured citations from real chunk metadata
     citations = parse_citations(answer, retrieved_docs)
 
     return {
