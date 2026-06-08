@@ -32,13 +32,12 @@ def upsert_chunks(document_id: str, vectors: list[dict]):
     }
     """
     index = get_index()
-    index.upsert(vectors=vectors, namespace=document_id)
+    index.upsert(vectors=vectors)
 
 
-def delete_document(document_id: str):
+def delete_document_vectors(document_id: str):
     """
-    Deletes all vectors in the document's namespace.
-    One call removes every chunk from that document.
+    Deletes all vectors for a document from the default namespace.
     """
     index = get_index()
-    index.delete(delete_all=True, namespace=document_id)
+    index.delete(filter={"document_id": {"$eq": document_id}})

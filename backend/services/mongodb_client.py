@@ -4,10 +4,6 @@ from datetime import datetime, timezone
 
 
 def get_collection():
-    """
-    Returns the 'documents' collection from MongoDB Atlas.
-    MongoClient handles connection pooling — safe to call on every request.
-    """
     client = MongoClient(os.getenv("MONGODB_URI"))
     db = client[os.getenv("MONGODB_DB_NAME", "kamka")]
     return db["documents"]
@@ -19,12 +15,8 @@ def insert_document(
     cloudinary_url: str,
     cloudinary_public_id: str,
     chunk_count: int,
-):
-    """
-    Inserts a new document record into MongoDB.
-    Uses document_id as the _id so it matches the Pinecone namespace
-    and Cloudinary public_id — one ID ties everything together.
-    """
+    user_id: str,
+    ):
     collection = get_collection()
     collection.insert_one({
         "_id": document_id,
@@ -32,36 +24,38 @@ def insert_document(
         "cloudinary_url": cloudinary_url,
         "cloudinary_public_id": cloudinary_public_id,
         "chunk_count": chunk_count,
+        "user_id": user_id,
         "uploaded_at": datetime.now(timezone.utc),
     })
 
 
-def get_all_documents() -> list[dict]:
+def get_user_documents(user_id: str) -> list[dict]:
     """
-    Returns all document records, newest first.
-    Renames _id to document_id for cleaner API responses.
+    Returns all documents belonging to a specific user, newest first.
     """
     collection = get_collection()
-    docs = list(collection.find().sort("uploaded_at", -1))
+    docs = list(collection.find({"user_id": user_id}).sort("uploaded_at", -1))
     for doc in docs:
         doc["document_id"] = str(doc.pop("_id"))
     return docs
 
 
-def get_document(document_id: str) -> dict | None:
+def get_document(document_id: str, user_id: str) -> dict | None:
     """
-    Returns a single document record by its ID, or None if not found.
+    Returns a document only if it belongs to the given user.
     """
     collection = get_collection()
-    doc = collection.find_one({"_id": document_id})
+    doc = collection.find_one({"_id": document_id, "user_id": user_id})
     if doc:
         doc["document_id"] = str(doc.pop("_id"))
     return doc
 
 
-def delete_document(document_id: str):
+def delete_document(document_id: str, user_id: str) -> bool:
     """
-    Deletes a document record from MongoDB by its ID.
+    Deletes a document only if it belongs to the given user.
+    Returns True if deleted, False if not found or not owned by user.
     """
     collection = get_collection()
-    collection.delete_one({"_id": document_id})
+    result = collection.delete_one({"_id": document_id, "user_id": user_id})
+    return result.deleted_count > 0
