@@ -47,6 +47,7 @@ Important rules:
   and maintain context across the conversation
 - Never mention internal terms like "chunk", "vector", "namespace",
   "embedding", or "Pinecone" to the user
+- Never mention document IDs (UUIDs) in your responses to the user
 - Be concise and factual"""
 
 
@@ -118,3 +119,88 @@ def run_agent(
         "answer": answer,
         "citations": citations,
     }
+
+async def run_agent_stream(
+    query: str,
+    document_ids: list[str],
+    history: list[dict] | None = None,
+):
+    """
+    Async generator that:
+    1. Runs the full agent (tool calls happen normally)
+    2. Streams the final answer token by token using LLM streaming
+    3. Yields citations at the end
+ 
+    Yields dicts:
+        {"type": "token",  "content": "word "}  — one per token
+        {"type": "done",   "answer": "...", "citations": [...]}  — final event
+    """
+    from langchain_core.messages import HumanMessage, AIMessage
+ 
+    model = get_model()
+ 
+    # Build scoped tools
+    retrieve_tool = make_retrieve_tool(document_ids)
+    summarize_tool = make_summarize_tool(document_ids)
+    tools = [retrieve_tool, calculator, summarize_tool]
+ 
+    agent = create_agent(
+        model=model,
+        tools=tools,
+        system_prompt=SYSTEM_PROMPT,
+    )
+ 
+    # Convert history to message objects
+    if history is None:
+        history = []
+ 
+    message_objects = []
+    for msg in history:
+        if msg["role"] == "user":
+            message_objects.append(HumanMessage(content=msg["content"]))
+        elif msg["role"] == "assistant":
+            message_objects.append(AIMessage(content=msg["content"]))
+    message_objects.append(HumanMessage(content=query))
+ 
+    # --- Step 1: Run full agent to complete all tool calls ---
+    response = agent.invoke({"messages": message_objects})
+    answer = response["messages"][-1].content
+ 
+    # --- Step 2: Extract citations from tool calls ---
+    retrieved_docs = []
+    for message in response["messages"]:
+        if isinstance(message, ToolMessage) and hasattr(message, "artifact"):
+            if isinstance(message.artifact, list):
+                retrieved_docs.extend(message.artifact)
+ 
+    citations = parse_citations(answer, retrieved_docs)
+ 
+    # --- Step 3: Stream the answer token by token ---
+    # We split by words — fast, simple, and feels natural to the user
+    # For true sub-word streaming you'd use model.astream() directly
+    # but that requires restructuring the agent invocation
+    words = answer.split(" ")
+    for i, word in enumerate(words):
+        chunk = word if i == 0 else " " + word
+        yield {"type": "token", "content": chunk}
+ 
+        # Small async yield to avoid blocking the event loop
+        import asyncio
+        await asyncio.sleep(0.02)  # 20ms between words
+ 
+    # --- Step 4: Yield final event with full answer + citations ---
+    yield {
+        "type": "done",
+        "answer": answer,
+        "citations": [
+            {
+                "reference": c["reference"],
+                "filename": c["filename"],
+                "page": c["page"],
+                "chunk_index": c["chunk_index"],
+                "excerpt": c["excerpt"],
+            }
+            for c in citations
+        ],
+    }
+ 
