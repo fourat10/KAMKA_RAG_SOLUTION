@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+
+  backend:
+    image: yourdockerhubusername/kamka-backend:latest
+    container_name: kamka-backend
+    ports:
+      - "8000:8000"
+    # No env_file needed — .env is baked into the image
+    volumes:
+      - huggingface_cache:/home/appuser/.cache/huggingface
+    restart: unless-stopped
+    networks:
+      - kamka-network
+
+  frontend:
+    image: yourdockerhubusername/kamka-frontend:latest
+    container_name: kamka-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - kamka-network
+
+volumes:
+  huggingface_cache:
+
+networks:
+  kamka-network:
+    driver: bridge
