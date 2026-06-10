@@ -352,6 +352,55 @@ npm start
 - ✅ Vector data isolated by document_id
 - ✅ Environment variables not exposed to frontend
 
+## Docker Deployment
+
+The project can be deployed using Docker Compose.
+
+### Folder Structure
+
+The client should create the following structure:
+
+```text
+kamka/
+├── docker-compose.prod.yml
+└── backend/
+    └── .env
+```
+
+- `docker-compose.prod.yml` is provided with the project.
+- `backend/.env` must be created from `.env.example` and populated with the required API keys and configuration values.
+
+### Start the Application
+
+From the root `kamka/` directory:
+
+```powershell
+docker compose -f docker-compose.prod.yml up
+```
+
+To run in detached mode:
+
+```powershell
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### Stop the Application
+
+```powershell
+docker compose -f docker-compose.prod.yml down
+```
+
+### Rebuild After Changes
+
+```powershell
+docker compose -f docker-compose.prod.yml up --build
+```
+
+Once started:
+
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:8000`
+
 ## Future Enhancements
 
 - [ ] User authentication
