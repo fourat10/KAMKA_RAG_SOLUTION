@@ -245,7 +245,7 @@ Response:
 
 ```
 # LLM
-OPENAI_API_KEY=sk-...
+OPENROUTER_API_KEY=sk-...
 
 # Vector Database
 PINECONE_API_KEY=...
@@ -277,7 +277,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 - **FastAPI** - Modern Python web framework
 - **Pydantic** - Data validation
-- **OpenAI** - LLM for answers
+- **OpenRouter** - LLM for answers
 - **Pinecone** - Vector database for embeddings
 - **MongoDB** - Document storage
 - **Cloudinary** - Cloud file storage
@@ -356,7 +356,6 @@ npm start
 
 - [ ] User authentication
 - [ ] Document sharing
-- [ ] Conversation history
 - [ ] Advanced search filters
 - [ ] Batch document upload
 - [ ] Export chat results

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { useAppStore } from "@/lib/store";
 
 interface Citation {
   reference: string;

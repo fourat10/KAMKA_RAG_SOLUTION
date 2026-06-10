@@ -33,4 +33,5 @@ dependencies = [
     "tavily-python>=0.7.24",
     "ipython>=9.13.0",
     "isort>=8.0.1",
+    "cohere>=7.0.3",
 ]

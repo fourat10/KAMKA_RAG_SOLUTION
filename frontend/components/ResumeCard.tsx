@@ -5,8 +5,7 @@ import {
   Mail,
   MapPin,
   Phone,
-  Github,
-  Linkedin,
+  Link,
   Award,
   Code,
   Briefcase,
@@ -18,18 +17,14 @@ interface ResumeCardProps {
 }
 
 export function ResumeCard({ content }: ResumeCardProps) {
-  // Helper function to parse sections from content
   const parseContent = (text: string) => {
-    // Clean markdown symbols
     const cleaned = text
-      .replace(/\*\*/g, "") // Remove bold markers
-      .replace(/#{1,6}\s+/g, "") // Remove headers
-      .replace(/\[(.+?)\]\((.+?)\)/g, "$1"); // Convert links to text
-
+      .replace(/\*\*/g, "")
+      .replace(/#{1,6}\s+/g, "")
+      .replace(/\[(.+?)\]\((.+?)\)/g, "$1");
     return cleaned;
   };
 
-  // Extract key information from content
   const extractContactInfo = (text: string) => {
     const contact = {
       name: "",
@@ -40,7 +35,6 @@ export function ResumeCard({ content }: ResumeCardProps) {
       github: "",
     };
 
-    // Simple extraction
     const emailMatch = text.match(
       /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/,
     );
@@ -49,16 +43,13 @@ export function ResumeCard({ content }: ResumeCardProps) {
     const phoneMatch = text.match(/\+?[\d\s\-()]{10,}/);
     if (phoneMatch) contact.phone = phoneMatch[0].trim();
 
-    // Try to find location (usually mentions Tunis, Tunisia)
     if (text.includes("Tunis") || text.includes("Tunisia")) {
       contact.location = "Tunis, Tunisia";
     }
 
-    // Extract name (usually starts with an uncommon pattern or is a proper name)
     const nameMatch = text.match(/^([A-Z][a-z]+\s+[A-Z][a-z]+)/m);
     if (nameMatch) contact.name = nameMatch[1];
 
-    // Extract social links
     const linkedinMatch = text.match(/linkedin\.com\/in\/[\w\-]+/i);
     if (linkedinMatch) contact.linkedin = linkedinMatch[0];
 
@@ -71,7 +62,6 @@ export function ResumeCard({ content }: ResumeCardProps) {
   const contact = extractContactInfo(content);
   const cleaned = parseContent(content);
 
-  // Split content into sections
   const sections = cleaned.split(
     /(?=^(Education|Technical Skills|Work Experience|Projects|Additional Information))/m,
   );
@@ -80,12 +70,11 @@ export function ResumeCard({ content }: ResumeCardProps) {
     const lines = section
       .split("\n")
       .filter((line) => line.trim())
-      .slice(0, 20); // Limit lines per section
+      .slice(0, 20);
 
     return lines.map((line, idx) => {
       const trimmed = line.trim();
 
-      // Section headers
       if (
         /^(Education|Technical Skills|Work Experience|Projects|Additional Information)/i.test(
           trimmed,
@@ -105,7 +94,6 @@ export function ResumeCard({ content }: ResumeCardProps) {
         );
       }
 
-      // Subsection headers (like company names, degree types)
       if (
         /^(Flask|Angular|MongoDB|AWS|LangChain|CrewAI|Spring Boot|ASP\.NET)/i.test(
           trimmed,
@@ -123,7 +111,6 @@ export function ResumeCard({ content }: ResumeCardProps) {
         );
       }
 
-      // Bullet points
       if (trimmed.startsWith("•") || trimmed.startsWith("-")) {
         return (
           <div key={idx} className="flex gap-3 mb-2 ml-4 text-gray-700">
@@ -133,7 +120,6 @@ export function ResumeCard({ content }: ResumeCardProps) {
         );
       }
 
-      // Regular paragraphs
       if (trimmed && !trimmed.endsWith(":")) {
         return (
           <p key={idx} className="text-gray-700 mb-2 text-sm leading-relaxed">
@@ -148,13 +134,12 @@ export function ResumeCard({ content }: ResumeCardProps) {
 
   return (
     <div className="w-full max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
-      {/* Header Section */}
+      {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-8">
         <h1 className="text-4xl font-bold mb-3">
           {contact.name || "Professional Resume"}
         </h1>
 
-        {/* Contact Info Grid */}
         <div className="flex flex-wrap gap-4 text-sm text-blue-50">
           {contact.location && (
             <div className="flex items-center gap-2 bg-blue-500 bg-opacity-40 px-3 py-2 rounded-lg">
@@ -184,7 +169,7 @@ export function ResumeCard({ content }: ResumeCardProps) {
               rel="noopener noreferrer"
               className="flex items-center gap-2 bg-blue-500 bg-opacity-40 px-3 py-2 rounded-lg hover:bg-opacity-60 transition"
             >
-              <Linkedin size={16} className="flex-shrink-0" />
+              <Link size={16} className="flex-shrink-0" />
               <span>LinkedIn</span>
             </a>
           )}
@@ -195,14 +180,14 @@ export function ResumeCard({ content }: ResumeCardProps) {
               rel="noopener noreferrer"
               className="flex items-center gap-2 bg-blue-500 bg-opacity-40 px-3 py-2 rounded-lg hover:bg-opacity-60 transition"
             >
-              <Github size={16} className="flex-shrink-0" />
+              <Link size={16} className="flex-shrink-0" />
               <span>GitHub</span>
             </a>
           )}
         </div>
       </div>
 
-      {/* Content Sections */}
+      {/* Content */}
       <div className="p-8 space-y-4">
         <div className="prose prose-sm max-w-none">
           {sections.map((section, idx) => (
